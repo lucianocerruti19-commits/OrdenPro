@@ -22,7 +22,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
 
 const supabaseUrl = "https://uumzxwtlvvqnmiwbrjly.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1bXp4d3RsdnZxbm1pd2Jyamx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc4MTUsImV4cCI6MjA4ODA1MzgxNX0.xtx6j1cuQr5Oqvgn4woKRpnKyKg-VaH2V7Zm8qghkUM";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1bXp4d3RsdnZxbm1pd2Jyamx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc4MTUsImV4cCI6MjA4ODA1MzgxNX0.xtx6j1cuQr5Oqvgn4woKRpnKyKg-VaH2V7Zm8qghkUM"
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -37,7 +37,7 @@ password: password
 })
 
 if(error){
-alert("Error login")
+alert(error.message)
 return
 }
 
@@ -69,24 +69,21 @@ function cargarPanel(perfil){
 const panel = document.getElementById("panel")
 
 if(perfil.rol === "dueno"){
-
 panel.innerHTML = "<h1>Panel Dueño</h1><p>Bienvenido " + perfil.nombre + "</p>"
-
 }
 
 if(perfil.rol === "mozo"){
-
 panel.innerHTML = "<h1>Panel Mozo</h1>"
-
 }
 
 if(perfil.rol === "cocina"){
-
 panel.innerHTML = "<h1>Panel Cocina</h1>"
-
 }
 
 }
+
+/* 👇 ESTA ES LA SOLUCIÓN */
+window.login = login
 
 </script>
 
