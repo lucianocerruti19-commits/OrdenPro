@@ -28,14 +28,15 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 let perfilGlobal = null
 
+// LOGIN
 async function login(){
 
 const email = document.getElementById("email").value
 const password = document.getElementById("password").value
 
 const { data, error } = await supabase.auth.signInWithPassword({
-email: email,
-password: password
+email,
+password
 })
 
 if(error){
@@ -43,12 +44,10 @@ alert(error.message)
 return
 }
 
-const user = data.user
-
-buscarPerfil(user.id)
-
+buscarPerfil(data.user.id)
 }
 
+// PERFIL
 async function buscarPerfil(user_id){
 
 const { data, error } = await supabase
@@ -63,12 +62,10 @@ return
 }
 
 perfilGlobal = data
-
 cargarPanel(data)
-
 }
 
-// 🔥 cargar mesas SOLO de su empresa
+// MESAS
 async function cargarMesas(){
 
 const { data, error } = await supabase
@@ -108,31 +105,86 @@ Mesa ${mesa.numero} - ${mesa.estado}
 `
 
 })
-
 }
 
-// 🔥 crear pedido al tocar mesa
+// ABRIR MESA → CREAR PEDIDO + MOSTRAR PRODUCTOS
 async function abrirMesa(mesa_id){
 
+// crear pedido
 const { data, error } = await supabase
 .from("pedidos")
 .insert([
 {
-mesa_id: mesa_id,
+mesa_id,
 empresa_id: perfilGlobal.empresa_id
 }
 ])
+.select()
 
 if(error){
 alert("Error creando pedido")
 return
 }
 
-alert("Pedido creado correctamente")
+const pedido = data[0]
+
+// traer productos
+const { data: productos, error: errorProd } = await supabase
+.from("productos")
+.select("*")
+.eq("empresa_id", perfilGlobal.empresa_id)
+
+if(errorProd){
+alert("Error cargando productos")
+return
+}
+
+const panel = document.getElementById("panel")
+
+panel.innerHTML = "<h2>Agregar productos</h2>"
+
+// mostrar productos
+productos.forEach(prod => {
+
+panel.innerHTML += `
+<div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
+style="
+border:1px solid black;
+padding:10px;
+margin:5px;
+border-radius:8px;
+">
+${prod.nombre} - $${prod.precio}
+</div>
+`
+
+})
 
 }
 
-// 🔥 panel por rol
+// AGREGAR PRODUCTO
+async function agregarProducto(pedido_id, producto_id){
+
+const { error } = await supabase
+.from("pedido_items")
+.insert([
+{
+pedido_id,
+producto_id,
+cantidad: 1
+}
+])
+
+if(error){
+alert("Error agregando producto")
+return
+}
+
+alert("Producto agregado")
+
+}
+
+// PANEL POR ROL
 function cargarPanel(perfil){
 
 if(perfil.rol === "dueno"){
@@ -149,9 +201,10 @@ document.getElementById("panel").innerHTML = "<h1>Pantalla Cocina</h1>"
 
 }
 
-// necesario para botones
+// GLOBAL
 window.login = login
 window.abrirMesa = abrirMesa
+window.agregarProducto = agregarProducto
 
 </script>
 
