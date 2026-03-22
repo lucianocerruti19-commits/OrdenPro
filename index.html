@@ -22,7 +22,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
 
 const supabaseUrl = "https://uumzxwtlvvqnmiwbrjly.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1bXp4d3RsdnZxbm1pd2Jyamx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc4MTUsImV4cCI6MjA4ODA1MzgxNX0.xtx6j1cuQr5Oqvgn4woKRpnKyKg-VaH2V7Zm8qghkUM"
+const supabaseKey = "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -64,26 +64,74 @@ cargarPanel(data)
 
 }
 
-function cargarPanel(perfil){
+// 🔥 NUEVO: cargar mesas
+async function cargarMesas(){
+
+const { data, error } = await supabase
+.from("mesas")
+.select("*")
+.order("numero", { ascending: true })
+
+if(error){
+alert("Error cargando mesas")
+return
+}
 
 const panel = document.getElementById("panel")
 
+panel.innerHTML = "<h1>Mesas</h1>"
+
+// diseño simple tipo POS
+data.forEach(mesa => {
+
+let color = "lightgreen"
+
+if(mesa.estado === "ocupada") color = "orange"
+if(mesa.estado === "esperando_comida") color = "red"
+if(mesa.estado === "pagando") color = "gray"
+
+panel.innerHTML += `
+<div onclick="abrirMesa('${mesa.id}')" 
+style="
+background:${color};
+padding:15px;
+margin:8px;
+border-radius:10px;
+font-size:18px;
+">
+Mesa ${mesa.numero} - ${mesa.estado}
+</div>
+`
+
+})
+
+}
+
+// 🔥 click en mesa (base para pedidos)
+function abrirMesa(id){
+alert("Abriste la mesa " + id)
+}
+
+// 🔥 panel por rol
+function cargarPanel(perfil){
+
 if(perfil.rol === "dueno"){
-panel.innerHTML = "<h1>Panel Dueño</h1><p>Bienvenido " + perfil.nombre + "</p>"
+cargarMesas()
 }
 
 if(perfil.rol === "mozo"){
-panel.innerHTML = "<h1>Panel Mozo</h1>"
+cargarMesas()
 }
 
 if(perfil.rol === "cocina"){
-panel.innerHTML = "<h1>Panel Cocina</h1>"
+document.getElementById("panel").innerHTML = "<h1>Pantalla Cocina</h1>"
 }
 
 }
 
-/* 👇 ESTA ES LA SOLUCIÓN */
+// necesario para botones
 window.login = login
+window.abrirMesa = abrirMesa
 
 </script>
 
