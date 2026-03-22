@@ -33,9 +33,7 @@ async function login(){
 const email = document.getElementById("email").value
 const password = document.getElementById("password").value
 
-const { data, error } = await supabase.auth.signInWithPassword({
-email, password
-})
+const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
 if(error){
 alert(error.message)
@@ -60,7 +58,7 @@ return
 }
 
 perfilGlobal = data
-cargarPanel(data)
+cargarMesas()
 }
 
 // MESAS
@@ -74,7 +72,7 @@ const { data } = await supabase
 
 const panel = document.getElementById("panel")
 
-panel.innerHTML = `<h1>Bienvenido ${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
+panel.innerHTML = `<h1>${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
 
 data.forEach(mesa => {
 
@@ -85,14 +83,14 @@ if(mesa.estado === "ocupada") color = "orange"
 panel.innerHTML += `
 <div onclick="abrirMesa('${mesa.id}')" 
 style="background:${color}; padding:15px; margin:8px; border-radius:10px;">
-Mesa ${mesa.numero}
+Mesa ${mesa.numero} - ${mesa.estado}
 </div>
 `
 
 })
 }
 
-// 🔥 FUNCIÓN PRO (NO CREA PEDIDO SI YA EXISTE)
+// 🔥 ABRIR MESA PRO
 async function abrirMesa(mesa_id){
 
 // buscar pedido abierto
@@ -114,12 +112,19 @@ const { data } = await supabase
 .insert([
 {
 mesa_id,
-empresa_id: perfilGlobal.empresa_id
+empresa_id: perfilGlobal.empresa_id,
+estado: "abierto"
 }
 ])
 .select()
 
 pedido = data[0]
+
+// 🔥 marcar mesa ocupada
+await supabase
+.from("mesas")
+.update({ estado: "ocupada" })
+.eq("id", mesa_id)
 
 }
 
@@ -129,11 +134,18 @@ const { data: productos } = await supabase
 .select("*")
 .eq("empresa_id", perfilGlobal.empresa_id)
 
-// items actuales
+// items
 const { data: items } = await supabase
 .from("pedido_items")
 .select("*, productos(nombre, precio)")
 .eq("pedido_id", pedido.id)
+
+renderPedido(pedido, productos, items)
+
+}
+
+// 🎨 RENDER PEDIDO (separado = más pro)
+function renderPedido(pedido, productos, items){
 
 const panel = document.getElementById("panel")
 
@@ -170,24 +182,28 @@ ${item.productos.nombre} x${item.cantidad} = $${subtotal}
 panel.innerHTML += `<h2>Total: $${total}</h2>`
 
 panel.innerHTML += `
-<button onclick="cerrarPedido('${pedido.id}')">Cerrar pedido</button>
+<button onclick="cerrarPedido('${pedido.id}', '${pedido.mesa_id}')">
+Cerrar pedido
+</button>
 <br><br>
 <button onclick="cargarMesas()">Volver</button>
 `
 
 }
 
-// agregar producto (recarga mesa correctamente)
+// ➕ agregar producto
 async function agregarProducto(pedido_id, producto_id){
 
 await supabase.from("pedido_items").insert([
 { pedido_id, producto_id, cantidad: 1 }
 ])
 
+// refrescar
 abrirMesaPorPedido(pedido_id)
+
 }
 
-// 🔥 refrescar misma mesa (clave)
+// 🔄 refrescar mesa
 async function abrirMesaPorPedido(pedido_id){
 
 const { data: pedido } = await supabase
@@ -197,27 +213,30 @@ const { data: pedido } = await supabase
 .single()
 
 abrirMesa(pedido.mesa_id)
+
 }
 
-// cerrar pedido
-async function cerrarPedido(pedido_id){
+// ❌ cerrar pedido
+async function cerrarPedido(pedido_id, mesa_id){
 
 await supabase
 .from("pedidos")
 .update({ estado: "cerrado" })
 .eq("id", pedido_id)
 
+// 🔥 liberar mesa
+await supabase
+.from("mesas")
+.update({ estado: "libre" })
+.eq("id", mesa_id)
+
 alert("Pedido cerrado")
+
 cargarMesas()
 
 }
 
-// panel
-function cargarPanel(perfil){
-cargarMesas()
-}
-
-// global
+// GLOBAL
 window.login = login
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
