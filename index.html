@@ -107,7 +107,7 @@ Mesa ${mesa.numero} - ${mesa.estado}
 })
 }
 
-// ABRIR MESA → CREAR PEDIDO + MOSTRAR PRODUCTOS
+// ABRIR MESA → PEDIDO + PRODUCTOS + CUENTA
 async function abrirMesa(mesa_id){
 
 // crear pedido
@@ -129,21 +129,24 @@ return
 const pedido = data[0]
 
 // traer productos
-const { data: productos, error: errorProd } = await supabase
+const { data: productos } = await supabase
 .from("productos")
 .select("*")
 .eq("empresa_id", perfilGlobal.empresa_id)
 
-if(errorProd){
-alert("Error cargando productos")
-return
-}
+// traer items con JOIN
+const { data: items } = await supabase
+.from("pedido_items")
+.select("*, productos(nombre, precio)")
+.eq("pedido_id", pedido.id)
 
 const panel = document.getElementById("panel")
 
-panel.innerHTML = "<h2>Agregar productos</h2>"
+panel.innerHTML = "<h2>Pedido</h2>"
 
-// mostrar productos
+// PRODUCTOS
+panel.innerHTML += "<h3>Agregar productos</h3>"
+
 productos.forEach(prod => {
 
 panel.innerHTML += `
@@ -159,6 +162,37 @@ ${prod.nombre} - $${prod.precio}
 `
 
 })
+
+// CUENTA
+let total = 0
+
+panel.innerHTML += "<h3>Cuenta</h3>"
+
+items?.forEach(item => {
+
+const subtotal = item.productos.precio * item.cantidad
+total += subtotal
+
+panel.innerHTML += `
+<div>
+${item.productos.nombre} x${item.cantidad} = $${subtotal}
+</div>
+`
+
+})
+
+panel.innerHTML += `<h2>Total: $${total}</h2>`
+
+panel.innerHTML += `
+<button onclick="cerrarPedido('${pedido.id}')">
+Cerrar pedido
+</button>
+`
+
+panel.innerHTML += `
+<br><br>
+<button onclick="cargarMesas()">Volver a mesas</button>
+`
 
 }
 
@@ -180,7 +214,28 @@ alert("Error agregando producto")
 return
 }
 
+// recargar mesa (simula actualización)
 alert("Producto agregado")
+cargarMesas()
+
+}
+
+// CERRAR PEDIDO
+async function cerrarPedido(pedido_id){
+
+const { error } = await supabase
+.from("pedidos")
+.update({ estado: "cerrado" })
+.eq("id", pedido_id)
+
+if(error){
+alert("Error cerrando pedido")
+return
+}
+
+alert("Pedido cerrado")
+
+cargarMesas()
 
 }
 
@@ -205,6 +260,8 @@ document.getElementById("panel").innerHTML = "<h1>Pantalla Cocina</h1>"
 window.login = login
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
+window.cerrarPedido = cerrarPedido
+window.cargarMesas = cargarMesas
 
 </script>
 
