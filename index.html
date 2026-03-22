@@ -30,13 +30,11 @@ let perfilGlobal = null
 
 // LOGIN
 async function login(){
-
 const email = document.getElementById("email").value
 const password = document.getElementById("password").value
 
 const { data, error } = await supabase.auth.signInWithPassword({
-email,
-password
+email, password
 })
 
 if(error){
@@ -68,16 +66,11 @@ cargarPanel(data)
 // MESAS
 async function cargarMesas(){
 
-const { data, error } = await supabase
+const { data } = await supabase
 .from("mesas")
 .select("*")
 .eq("empresa_id", perfilGlobal.empresa_id)
 .order("numero", { ascending: true })
-
-if(error){
-alert("Error cargando mesas")
-return
-}
 
 const panel = document.getElementById("panel")
 
@@ -88,30 +81,35 @@ data.forEach(mesa => {
 let color = "lightgreen"
 
 if(mesa.estado === "ocupada") color = "orange"
-if(mesa.estado === "esperando_comida") color = "red"
-if(mesa.estado === "pagando") color = "gray"
 
 panel.innerHTML += `
 <div onclick="abrirMesa('${mesa.id}')" 
-style="
-background:${color};
-padding:15px;
-margin:8px;
-border-radius:10px;
-font-size:18px;
-">
-Mesa ${mesa.numero} - ${mesa.estado}
+style="background:${color}; padding:15px; margin:8px; border-radius:10px;">
+Mesa ${mesa.numero}
 </div>
 `
 
 })
 }
 
-// ABRIR MESA → PEDIDO + PRODUCTOS + CUENTA
+// 🔥 FUNCIÓN PRO (NO CREA PEDIDO SI YA EXISTE)
 async function abrirMesa(mesa_id){
 
-// crear pedido
-const { data, error } = await supabase
+// buscar pedido abierto
+const { data: pedidosExistentes } = await supabase
+.from("pedidos")
+.select("*")
+.eq("mesa_id", mesa_id)
+.eq("estado", "abierto")
+.limit(1)
+
+let pedido = null
+
+if(pedidosExistentes.length > 0){
+pedido = pedidosExistentes[0]
+}else{
+
+const { data } = await supabase
 .from("pedidos")
 .insert([
 {
@@ -121,20 +119,17 @@ empresa_id: perfilGlobal.empresa_id
 ])
 .select()
 
-if(error){
-alert("Error creando pedido")
-return
+pedido = data[0]
+
 }
 
-const pedido = data[0]
-
-// traer productos
+// productos
 const { data: productos } = await supabase
 .from("productos")
 .select("*")
 .eq("empresa_id", perfilGlobal.empresa_id)
 
-// traer items con JOIN
+// items actuales
 const { data: items } = await supabase
 .from("pedido_items")
 .select("*, productos(nombre, precio)")
@@ -144,32 +139,24 @@ const panel = document.getElementById("panel")
 
 panel.innerHTML = "<h2>Pedido</h2>"
 
-// PRODUCTOS
+// productos
 panel.innerHTML += "<h3>Agregar productos</h3>"
 
 productos.forEach(prod => {
-
 panel.innerHTML += `
 <div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
-style="
-border:1px solid black;
-padding:10px;
-margin:5px;
-border-radius:8px;
-">
+style="border:1px solid black; padding:10px; margin:5px;">
 ${prod.nombre} - $${prod.precio}
 </div>
 `
-
 })
 
-// CUENTA
+// cuenta
 let total = 0
 
 panel.innerHTML += "<h3>Cuenta</h3>"
 
 items?.forEach(item => {
-
 const subtotal = item.productos.precio * item.cantidad
 total += subtotal
 
@@ -178,90 +165,63 @@ panel.innerHTML += `
 ${item.productos.nombre} x${item.cantidad} = $${subtotal}
 </div>
 `
-
 })
 
 panel.innerHTML += `<h2>Total: $${total}</h2>`
 
 panel.innerHTML += `
-<button onclick="cerrarPedido('${pedido.id}')">
-Cerrar pedido
-</button>
-`
-
-panel.innerHTML += `
+<button onclick="cerrarPedido('${pedido.id}')">Cerrar pedido</button>
 <br><br>
-<button onclick="cargarMesas()">Volver a mesas</button>
+<button onclick="cargarMesas()">Volver</button>
 `
 
 }
 
-// AGREGAR PRODUCTO
+// agregar producto (recarga mesa correctamente)
 async function agregarProducto(pedido_id, producto_id){
 
-const { error } = await supabase
-.from("pedido_items")
-.insert([
-{
-pedido_id,
-producto_id,
-cantidad: 1
-}
+await supabase.from("pedido_items").insert([
+{ pedido_id, producto_id, cantidad: 1 }
 ])
 
-if(error){
-alert("Error agregando producto")
-return
+abrirMesaPorPedido(pedido_id)
 }
 
-// recargar mesa (simula actualización)
-alert("Producto agregado")
-cargarMesas()
+// 🔥 refrescar misma mesa (clave)
+async function abrirMesaPorPedido(pedido_id){
 
+const { data: pedido } = await supabase
+.from("pedidos")
+.select("*")
+.eq("id", pedido_id)
+.single()
+
+abrirMesa(pedido.mesa_id)
 }
 
-// CERRAR PEDIDO
+// cerrar pedido
 async function cerrarPedido(pedido_id){
 
-const { error } = await supabase
+await supabase
 .from("pedidos")
 .update({ estado: "cerrado" })
 .eq("id", pedido_id)
 
-if(error){
-alert("Error cerrando pedido")
-return
-}
-
 alert("Pedido cerrado")
-
 cargarMesas()
 
 }
 
-// PANEL POR ROL
+// panel
 function cargarPanel(perfil){
-
-if(perfil.rol === "dueno"){
 cargarMesas()
 }
 
-if(perfil.rol === "mozo"){
-cargarMesas()
-}
-
-if(perfil.rol === "cocina"){
-document.getElementById("panel").innerHTML = "<h1>Pantalla Cocina</h1>"
-}
-
-}
-
-// GLOBAL
+// global
 window.login = login
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
 window.cerrarPedido = cerrarPedido
-window.cargarMesas = cargarMesas
 
 </script>
 
