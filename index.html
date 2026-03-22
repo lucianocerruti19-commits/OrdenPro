@@ -26,6 +26,8 @@ const supabaseKey = "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+let perfilGlobal = null
+
 async function login(){
 
 const email = document.getElementById("email").value
@@ -60,16 +62,19 @@ alert("No se encontró perfil")
 return
 }
 
+perfilGlobal = data
+
 cargarPanel(data)
 
 }
 
-// 🔥 NUEVO: cargar mesas
+// 🔥 cargar mesas SOLO de su empresa
 async function cargarMesas(){
 
 const { data, error } = await supabase
 .from("mesas")
 .select("*")
+.eq("empresa_id", perfilGlobal.empresa_id)
 .order("numero", { ascending: true })
 
 if(error){
@@ -79,9 +84,8 @@ return
 
 const panel = document.getElementById("panel")
 
-panel.innerHTML = "<h1>Mesas</h1>"
+panel.innerHTML = `<h1>Bienvenido ${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
 
-// diseño simple tipo POS
 data.forEach(mesa => {
 
 let color = "lightgreen"
@@ -107,9 +111,25 @@ Mesa ${mesa.numero} - ${mesa.estado}
 
 }
 
-// 🔥 click en mesa (base para pedidos)
-function abrirMesa(id){
-alert("Abriste la mesa " + id)
+// 🔥 crear pedido al tocar mesa
+async function abrirMesa(mesa_id){
+
+const { data, error } = await supabase
+.from("pedidos")
+.insert([
+{
+mesa_id: mesa_id,
+empresa_id: perfilGlobal.empresa_id
+}
+])
+
+if(error){
+alert("Error creando pedido")
+return
+}
+
+alert("Pedido creado correctamente")
+
 }
 
 // 🔥 panel por rol
