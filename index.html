@@ -30,288 +30,262 @@ let perfilGlobal = null
 
 // LOGIN
 async function login(){
-const email = document.getElementById("email").value
-const password = document.getElementById("password").value
+    const email = document.getElementById("email").value
+    const password = document.getElementById("password").value
 
-const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-if(error){
-alert(error.message)
-return
-}
+    if(error){
+        alert(error.message)
+        return
+    }
 
-buscarPerfil(data.user.id)
+    buscarPerfil(data.user.id)
 }
 
 // PERFIL
 async function buscarPerfil(user_id){
+    const { data, error } = await supabase
+        .from("perfiles")
+        .select("*")
+        .eq("id", user_id)
+        .single()
 
-const { data, error } = await supabase
-.from("perfiles")
-.select("*")
-.eq("id", user_id)
-.single()
+    if(error){
+        alert("No se encontró perfil")
+        return
+    }
 
-if(error){
-alert("No se encontró perfil")
-return
-}
-
-perfilGlobal = data
-cargarPanel(data)
+    perfilGlobal = data
+    cargarPanel(data)
 }
 
 // PANEL POR ROL
 function cargarPanel(perfil){
-
-if(perfil.rol === "dueno"){
-panelAdmin()
-}
-
-if(perfil.rol === "mozo"){
-cargarMesas()
-}
-
-if(perfil.rol === "cocina"){
-pantallaCocina()
-}
-
+    if(perfil.rol === "dueno"){
+        panelAdmin()
+    } else if(perfil.rol === "mozo"){
+        cargarMesas()
+    } else if(perfil.rol === "cocina"){
+        pantallaCocina()
+    }
 }
 
 // MESAS
 async function cargarMesas(){
+    const { data } = await supabase
+        .from("mesas")
+        .select("*")
+        .eq("empresa_id", perfilGlobal.empresa_id)
+        .order("numero", { ascending: true })
 
-const { data } = await supabase
-.from("mesas")
-.select("*")
-.eq("empresa_id", perfilGlobal.empresa_id)
-.order("numero", { ascending: true })
+    const panel = document.getElementById("panel")
+    panel.innerHTML = `<h1>${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
 
-const panel = document.getElementById("panel")
+    data.forEach(mesa => {
+        let color = "lightgreen"
+        if(mesa.estado === "ocupada") color = "orange"
 
-panel.innerHTML = `<h1>${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
-
-data.forEach(mesa => {
-
-let color = "lightgreen"
-if(mesa.estado === "ocupada") color = "orange"
-
-panel.innerHTML += `
-<div onclick="abrirMesa('${mesa.id}')" 
-style="background:${color}; padding:15px; margin:8px; border-radius:10px;">
-Mesa ${mesa.numero} - ${mesa.estado}
-</div>
-`
-
-})
+        panel.innerHTML += `
+            <div onclick="abrirMesa('${mesa.id}')"
+            style="background:${color}; padding:15px; margin:8px; border-radius:10px;">
+                Mesa ${mesa.numero} - ${mesa.estado}
+            </div>
+        `
+    })
 }
 
 // ABRIR MESA
 async function abrirMesa(mesa_id){
+    const { data: pedidosExistentes } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("mesa_id", mesa_id)
+        .eq("estado", "abierto")
+        .limit(1)
 
-const { data: pedidosExistentes } = await supabase
-.from("pedidos")
-.select("*")
-.eq("mesa_id", mesa_id)
-.eq("estado", "abierto")
-.limit(1)
+    let pedido = null
 
-let pedido = null
+    if(pedidosExistentes.length > 0){
+        pedido = pedidosExistentes[0]
+    } else {
+        const { data } = await supabase
+            .from("pedidos")
+            .insert([{
+                mesa_id,
+                empresa_id: perfilGlobal.empresa_id,
+                estado: "abierto"
+            }])
+            .select()
 
-if(pedidosExistentes.length > 0){
-pedido = pedidosExistentes[0]
-}else{
+        pedido = data[0]
 
-const { data } = await supabase
-.from("pedidos")
-.insert([{
-mesa_id,
-empresa_id: perfilGlobal.empresa_id,
-estado: "abierto"
-}]).select()
+        await supabase
+            .from("mesas")
+            .update({ estado: "ocupada" })
+            .eq("id", mesa_id)
+    }
 
-pedido = data[0]
+    const { data: productos } = await supabase
+        .from("productos")
+        .select("*")
+        .eq("empresa_id", perfilGlobal.empresa_id)
 
-await supabase
-.from("mesas")
-.update({ estado: "ocupada" })
-.eq("id", mesa_id)
+    const { data: items } = await supabase
+        .from("pedido_items")
+        .select("*, productos(nombre, precio, stock)")
+        .eq("pedido_id", pedido.id)
 
-}
-
-const { data: productos } = await supabase
-.from("productos")
-.select("*")
-.eq("empresa_id", perfilGlobal.empresa_id)
-
-const { data: items } = await supabase
-.from("pedido_items")
-.select("*, productos(nombre, precio)")
-.eq("pedido_id", pedido.id)
-
-renderPedido(pedido, productos, items)
+    renderPedido(pedido, productos, items)
 }
 
 // RENDER PEDIDO
 function renderPedido(pedido, productos, items){
+    const panel = document.getElementById("panel")
+    panel.innerHTML = "<h2>Pedido</h2>"
 
-const panel = document.getElementById("panel")
+    // productos
+    panel.innerHTML += "<h3>Agregar productos</h3>"
 
-panel.innerHTML = "<h2>Pedido</h2>"
+    productos.forEach(prod => {
+        panel.innerHTML += `
+            <div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
+                style="border:1px solid black; padding:10px; margin:5px;">
+                ${prod.nombre} - $${prod.precio} (Stock: ${prod.stock})
+            </div>
+        `
+    })
 
-// productos
-panel.innerHTML += "<h3>Agregar productos</h3>"
+    // cuenta
+    let total = 0
+    panel.innerHTML += "<h3>Cuenta</h3>"
 
-productos.forEach(prod => {
-panel.innerHTML += `
-<div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
-style="border:1px solid black; padding:10px; margin:5px;">
-${prod.nombre} - $${prod.precio}
-</div>
-`
-})
+    items?.forEach(item => {
+        const subtotal = item.productos.precio * item.cantidad
+        total += subtotal
 
-// cuenta
-let total = 0
+        panel.innerHTML += `
+            <div>${item.productos.nombre} x${item.cantidad} = $${subtotal}</div>
+        `
+    })
 
-panel.innerHTML += "<h3>Cuenta</h3>"
+    panel.innerHTML += `<h2>Total: $${total}</h2>`
 
-items?.forEach(item => {
-const subtotal = item.productos.precio * item.cantidad
-total += subtotal
-
-panel.innerHTML += `
-<div>
-${item.productos.nombre} x${item.cantidad} = $${subtotal}
-</div>
-`
-})
-
-panel.innerHTML += `<h2>Total: $${total}</h2>`
-
-panel.innerHTML += `
-<button onclick="cerrarPedido('${pedido.id}', '${pedido.mesa_id}')">
-Cerrar pedido
-</button>
-<br><br>
-<button onclick="cargarMesas()">Volver</button>
-`
-
+    panel.innerHTML += `
+        <button onclick="cerrarPedido('${pedido.id}', '${pedido.mesa_id}')">
+            Cerrar pedido
+        </button>
+        <br><br>
+        <button onclick="cargarMesas()">Volver</button>
+    `
 }
 
-// AGREGAR PRODUCTO
+// AGREGAR PRODUCTO CON STOCK
 async function agregarProducto(pedido_id, producto_id){
+    // traer producto
+    const { data: producto } = await supabase
+        .from("productos")
+        .select("*")
+        .eq("id", producto_id)
+        .single()
 
-await supabase.from("pedido_items").insert([
-{ pedido_id, producto_id, cantidad: 1 }
-])
+    if(producto.stock <= 0){
+        alert("Sin stock")
+        return
+    }
 
-abrirMesaPorPedido(pedido_id)
+    // agregar al pedido
+    await supabase.from("pedido_items").insert([
+        { pedido_id, producto_id, cantidad: 1 }
+    ])
+
+    // descontar stock
+    await supabase
+        .from("productos")
+        .update({ stock: producto.stock - 1 })
+        .eq("id", producto_id)
+
+    // refrescar
+    abrirMesaPorPedido(pedido_id)
 }
 
 // REFRESCAR
 async function abrirMesaPorPedido(pedido_id){
+    const { data: pedido } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("id", pedido_id)
+        .single()
 
-const { data: pedido } = await supabase
-.from("pedidos")
-.select("*")
-.eq("id", pedido_id)
-.single()
-
-abrirMesa(pedido.mesa_id)
+    abrirMesa(pedido.mesa_id)
 }
 
-// CERRAR PEDIDO (CON TOTAL 💰)
+// CERRAR PEDIDO
 async function cerrarPedido(pedido_id, mesa_id){
+    const { data: items } = await supabase
+        .from("pedido_items")
+        .select("*, productos(precio)")
+        .eq("pedido_id", pedido_id)
 
-const { data: items } = await supabase
-.from("pedido_items")
-.select("*, productos(precio)")
-.eq("pedido_id", pedido_id)
+    let total = 0
+    items.forEach(item => total += item.productos.precio * item.cantidad)
 
-let total = 0
+    await supabase
+        .from("pedidos")
+        .update({ estado: "cerrado", total: total })
+        .eq("id", pedido_id)
 
-items.forEach(item => {
-total += item.productos.precio * item.cantidad
-})
+    await supabase
+        .from("mesas")
+        .update({ estado: "libre" })
+        .eq("id", mesa_id)
 
-await supabase
-.from("pedidos")
-.update({
-estado: "cerrado",
-total: total
-})
-.eq("id", pedido_id)
-
-await supabase
-.from("mesas")
-.update({ estado: "libre" })
-.eq("id", mesa_id)
-
-alert("Pedido cerrado $" + total)
-
-cargarMesas()
-
+    alert("Pedido cerrado $" + total)
+    cargarMesas()
 }
 
-// 🔥 PANEL ADMIN
+// PANEL ADMIN
 async function panelAdmin(){
+    const { data: pedidos } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("empresa_id", perfilGlobal.empresa_id)
+        .eq("estado", "cerrado")
 
-const { data: pedidos } = await supabase
-.from("pedidos")
-.select("*")
-.eq("empresa_id", perfilGlobal.empresa_id)
-.eq("estado", "cerrado")
+    let totalDia = 0
+    pedidos.forEach(p => totalDia += p.total || 0)
 
-let totalDia = 0
-
-pedidos.forEach(p => {
-totalDia += p.total || 0
-})
-
-const panel = document.getElementById("panel")
-
-panel.innerHTML = `
-<h1>📊 Admin</h1>
-
-<h2>💰 Total: $${totalDia}</h2>
-<h3>Pedidos: ${pedidos.length}</h3>
-
-<button onclick="verProductosVendidos()">Productos vendidos</button>
-<br><br>
-<button onclick="cargarMesas()">Ir al POS</button>
-`
-
+    const panel = document.getElementById("panel")
+    panel.innerHTML = `
+        <h1>📊 Admin</h1>
+        <h2>💰 Total: $${totalDia}</h2>
+        <h3>Pedidos: ${pedidos.length}</h3>
+        <button onclick="verProductosVendidos()">Productos vendidos</button>
+        <br><br>
+        <button onclick="cargarMesas()">Ir al POS</button>
+    `
 }
 
 // PRODUCTOS VENDIDOS
 async function verProductosVendidos(){
+    const { data: items } = await supabase
+        .from("pedido_items")
+        .select("*, productos(nombre)")
 
-const { data: items } = await supabase
-.from("pedido_items")
-.select("*, productos(nombre)")
+    const contador = {}
+    items.forEach(item => {
+        const nombre = item.productos.nombre
+        contador[nombre] = (contador[nombre] || 0) + item.cantidad
+    })
 
-const contador = {}
+    const panel = document.getElementById("panel")
+    panel.innerHTML = "<h2>Productos vendidos</h2>"
 
-items.forEach(item => {
+    for(const prod in contador){
+        panel.innerHTML += `<div>${prod}: ${contador[prod]}</div>`
+    }
 
-const nombre = item.productos.nombre
-
-if(!contador[nombre]) contador[nombre] = 0
-
-contador[nombre] += item.cantidad
-
-})
-
-const panel = document.getElementById("panel")
-
-panel.innerHTML = "<h2>Productos vendidos</h2>"
-
-for(const prod in contador){
-panel.innerHTML += `<div>${prod}: ${contador[prod]}</div>`
-}
-
-panel.innerHTML += `<br><button onclick="panelAdmin()">Volver</button>`
+    panel.innerHTML += `<br><button onclick="panelAdmin()">Volver</button>`
 }
 
 // GLOBAL
