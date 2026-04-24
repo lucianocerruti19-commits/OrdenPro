@@ -19,7 +19,7 @@
 
 <script type="module">
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const supabaseUrl = "https://uumzxwtlvvqnmiwbrjly.supabase.co"
 const supabaseKey = "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
@@ -36,6 +36,7 @@ async function login(){
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if(error){
+        console.log(error)
         alert(error.message)
         return
     }
@@ -60,7 +61,7 @@ async function buscarPerfil(user_id){
     cargarPanel(data)
 }
 
-// PANEL POR ROL
+// PANEL
 function cargarPanel(perfil){
     if(perfil.rol === "dueno"){
         panelAdmin()
@@ -75,21 +76,18 @@ async function cargarMesas(){
         .from("mesas")
         .select("*")
         .eq("empresa_id", perfilGlobal.empresa_id)
-        .order("numero", { ascending: true })
 
     const panel = document.getElementById("panel")
-    panel.innerHTML = `<h1>${perfilGlobal.nombre}</h1><h2>Mesas</h2>`
+    panel.innerHTML = `<h2>Mesas</h2>`
 
     data.forEach(mesa => {
-        let color = "lightgreen"
-        if(mesa.estado === "ocupada") color = "orange"
+        let color = mesa.estado === "ocupada" ? "orange" : "lightgreen"
 
         panel.innerHTML += `
         <div onclick="abrirMesa('${mesa.id}')"
         style="background:${color}; padding:15px; margin:8px; border-radius:10px;">
-            Mesa ${mesa.numero} - ${mesa.estado}
-        </div>
-        `
+            Mesa ${mesa.numero}
+        </div>`
     })
 }
 
@@ -103,18 +101,12 @@ async function abrirMesa(mesa_id){
         .eq("estado", "abierto")
         .limit(1)
 
-    let pedido = null
+    let pedido = pedidosExistentes?.[0]
 
-    if(pedidosExistentes.length > 0){
-        pedido = pedidosExistentes[0]
-    } else {
+    if(!pedido){
         const { data } = await supabase
             .from("pedidos")
-            .insert([{
-                mesa_id,
-                empresa_id: perfilGlobal.empresa_id,
-                estado: "abierto"
-            }])
+            .insert([{ mesa_id, empresa_id: perfilGlobal.empresa_id, estado: "abierto" }])
             .select()
 
         pedido = data[0]
@@ -138,70 +130,53 @@ async function abrirMesa(mesa_id){
     renderPedido(pedido, productos, items)
 }
 
-// RENDER PEDIDO
+// RENDER
 function renderPedido(pedido, productos, items){
 
     const panel = document.getElementById("panel")
     panel.innerHTML = "<h2>Pedido</h2>"
 
-    panel.innerHTML += "<h3>Agregar productos</h3>"
-
     productos.forEach(prod => {
         panel.innerHTML += `
-        <div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
-        style="border:1px solid black; padding:10px; margin:5px;">
-            ${prod.nombre} - $${prod.precio} (Stock: ${prod.stock})
-        </div>
-        `
+        <div onclick="agregarProducto('${pedido.id}','${prod.id}')"
+        style="border:1px solid black; margin:5px; padding:10px;">
+            ${prod.nombre} - $${prod.precio} (Stock ${prod.stock})
+        </div>`
     })
 
     let total = 0
 
-    panel.innerHTML += "<h3>Cuenta</h3>"
-
-    items?.forEach(item => {
-        const subtotal = item.productos.precio * item.cantidad
-        total += subtotal
-
-        panel.innerHTML += `
-        <div>
-            ${item.productos.nombre} x${item.cantidad} = $${subtotal}
-        </div>
-        `
+    items?.forEach(i => {
+        total += i.productos.precio * i.cantidad
+        panel.innerHTML += `<div>${i.productos.nombre} x${i.cantidad}</div>`
     })
 
-    panel.innerHTML += `<h2>Total: $${total}</h2>`
+    panel.innerHTML += `<h3>Total: $${total}</h3>`
 
     panel.innerHTML += `
-    <button onclick="cerrarPedido('${pedido.id}', '${pedido.mesa_id}')">
-        Cerrar pedido
-    </button>
-    <br><br>
-    <button onclick="cargarMesas()">Volver</button>
-    `
+    <button onclick="cerrarPedido('${pedido.id}','${pedido.mesa_id}')">Cerrar</button>
+    <button onclick="cargarMesas()">Volver</button>`
 }
 
-// AGREGAR PRODUCTO + STOCK
+// AGREGAR PRODUCTO
 async function agregarProducto(pedido_id, producto_id){
 
-    const { data: producto } = await supabase
+    const { data: prod } = await supabase
         .from("productos")
         .select("*")
         .eq("id", producto_id)
         .single()
 
-    if(producto.stock <= 0){
+    if(prod.stock <= 0){
         alert("Sin stock")
         return
     }
 
-    await supabase.from("pedido_items").insert([
-        { pedido_id, producto_id, cantidad: 1 }
-    ])
+    await supabase.from("pedido_items").insert([{ pedido_id, producto_id, cantidad: 1 }])
 
     await supabase
         .from("productos")
-        .update({ stock: producto.stock - 1 })
+        .update({ stock: prod.stock - 1 })
         .eq("id", producto_id)
 
     abrirMesaPorPedido(pedido_id)
@@ -209,16 +184,11 @@ async function agregarProducto(pedido_id, producto_id){
 
 // REFRESCAR
 async function abrirMesaPorPedido(pedido_id){
-    const { data: pedido } = await supabase
-        .from("pedidos")
-        .select("*")
-        .eq("id", pedido_id)
-        .single()
-
-    abrirMesa(pedido.mesa_id)
+    const { data } = await supabase.from("pedidos").select("*").eq("id", pedido_id).single()
+    abrirMesa(data.mesa_id)
 }
 
-// CERRAR PEDIDO
+// CERRAR
 async function cerrarPedido(pedido_id, mesa_id){
 
     const { data: items } = await supabase
@@ -227,15 +197,13 @@ async function cerrarPedido(pedido_id, mesa_id){
         .eq("pedido_id", pedido_id)
 
     let total = 0
-    items.forEach(item => total += item.productos.precio * item.cantidad)
+    items.forEach(i => total += i.productos.precio * i.cantidad)
 
-    await supabase
-        .from("pedidos")
-        .update({ estado: "cerrado", total: total })
+    await supabase.from("pedidos")
+        .update({ estado: "cerrado", total })
         .eq("id", pedido_id)
 
-    await supabase
-        .from("mesas")
+    await supabase.from("mesas")
         .update({ estado: "libre" })
         .eq("id", mesa_id)
 
@@ -243,7 +211,7 @@ async function cerrarPedido(pedido_id, mesa_id){
     cargarMesas()
 }
 
-// ADMIN PRO (GANANCIAS REALES)
+// ADMIN PRO
 async function panelAdmin(){
 
     const { data: pedidos } = await supabase
@@ -256,53 +224,20 @@ async function panelAdmin(){
     let costos = 0
 
     pedidos.forEach(p => {
-        p.pedido_items?.forEach(item => {
-            ventas += item.productos.precio * item.cantidad
-            costos += (item.productos.costo || 0) * item.cantidad
+        p.pedido_items?.forEach(i => {
+            ventas += i.productos.precio * i.cantidad
+            costos += (i.productos.costo || 0) * i.cantidad
         })
     })
-
-    const ganancia = ventas - costos
 
     const panel = document.getElementById("panel")
 
     panel.innerHTML = `
-        <h1>📊 Admin PRO</h1>
-
-        <h2>💰 Ventas: $${ventas}</h2>
-        <h2>📦 Costos: $${costos}</h2>
-        <h2>🔥 Ganancia: $${ganancia}</h2>
-
-        <h3>Pedidos: ${pedidos.length}</h3>
-
-        <button onclick="verProductosVendidos()">Productos vendidos</button>
-        <br><br>
-        <button onclick="cargarMesas()">Ir al POS</button>
-    `
-}
-
-// PRODUCTOS VENDIDOS
-async function verProductosVendidos(){
-
-    const { data: items } = await supabase
-        .from("pedido_items")
-        .select("*, productos(nombre)")
-
-    const contador = {}
-
-    items.forEach(item => {
-        const nombre = item.productos.nombre
-        contador[nombre] = (contador[nombre] || 0) + item.cantidad
-    })
-
-    const panel = document.getElementById("panel")
-    panel.innerHTML = "<h2>Productos vendidos</h2>"
-
-    for(const prod in contador){
-        panel.innerHTML += `<div>${prod}: ${contador[prod]}</div>`
-    }
-
-    panel.innerHTML += `<br><button onclick="panelAdmin()">Volver</button>`
+    <h1>Admin</h1>
+    <h2>Ventas: $${ventas}</h2>
+    <h2>Costos: $${costos}</h2>
+    <h2>Ganancia: $${ventas - costos}</h2>
+    <button onclick="cargarMesas()">Ir al POS</button>`
 }
 
 // GLOBAL
@@ -310,8 +245,6 @@ window.login = login
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
 window.cerrarPedido = cerrarPedido
-window.panelAdmin = panelAdmin
-window.verProductosVendidos = verProductosVendidos
 window.cargarMesas = cargarMesas
 
 </script>
