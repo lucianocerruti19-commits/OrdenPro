@@ -13,13 +13,15 @@
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Password">
 
-<button onclick="login()">Entrar</button>
+<button id="btnLogin">Entrar</button>
 
 <div id="panel"></div>
 
 <script type="module">
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+console.log("JS cargado")
 
 const supabaseUrl = "https://uumzxwtlvvqnmiwbrjly.supabase.co"
 const supabaseKey = "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
@@ -30,8 +32,14 @@ let perfilGlobal = null
 
 // LOGIN
 async function login(){
+
     const email = document.getElementById("email").value
     const password = document.getElementById("password").value
+
+    if(!email || !password){
+        alert("Completá email y contraseña")
+        return
+    }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -46,6 +54,7 @@ async function login(){
 
 // PERFIL
 async function buscarPerfil(user_id){
+
     const { data, error } = await supabase
         .from("perfiles")
         .select("*")
@@ -72,15 +81,18 @@ function cargarPanel(perfil){
 
 // MESAS
 async function cargarMesas(){
+
     const { data } = await supabase
         .from("mesas")
         .select("*")
         .eq("empresa_id", perfilGlobal.empresa_id)
 
     const panel = document.getElementById("panel")
+
     panel.innerHTML = `<h2>Mesas</h2>`
 
     data.forEach(mesa => {
+
         let color = mesa.estado === "ocupada" ? "orange" : "lightgreen"
 
         panel.innerHTML += `
@@ -104,9 +116,14 @@ async function abrirMesa(mesa_id){
     let pedido = pedidosExistentes?.[0]
 
     if(!pedido){
+
         const { data } = await supabase
             .from("pedidos")
-            .insert([{ mesa_id, empresa_id: perfilGlobal.empresa_id, estado: "abierto" }])
+            .insert([{
+                mesa_id,
+                empresa_id: perfilGlobal.empresa_id,
+                estado: "abierto"
+            }])
             .select()
 
         pedido = data[0]
@@ -172,7 +189,9 @@ async function agregarProducto(pedido_id, producto_id){
         return
     }
 
-    await supabase.from("pedido_items").insert([{ pedido_id, producto_id, cantidad: 1 }])
+    await supabase.from("pedido_items").insert([
+        { pedido_id, producto_id, cantidad: 1 }
+    ])
 
     await supabase
         .from("productos")
@@ -184,7 +203,13 @@ async function agregarProducto(pedido_id, producto_id){
 
 // REFRESCAR
 async function abrirMesaPorPedido(pedido_id){
-    const { data } = await supabase.from("pedidos").select("*").eq("id", pedido_id).single()
+
+    const { data } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("id", pedido_id)
+        .single()
+
     abrirMesa(data.mesa_id)
 }
 
@@ -199,11 +224,13 @@ async function cerrarPedido(pedido_id, mesa_id){
     let total = 0
     items.forEach(i => total += i.productos.precio * i.cantidad)
 
-    await supabase.from("pedidos")
+    await supabase
+        .from("pedidos")
         .update({ estado: "cerrado", total })
         .eq("id", pedido_id)
 
-    await supabase.from("mesas")
+    await supabase
+        .from("mesas")
         .update({ estado: "libre" })
         .eq("id", mesa_id)
 
@@ -211,7 +238,7 @@ async function cerrarPedido(pedido_id, mesa_id){
     cargarMesas()
 }
 
-// ADMIN PRO
+// ADMIN
 async function panelAdmin(){
 
     const { data: pedidos } = await supabase
@@ -240,8 +267,10 @@ async function panelAdmin(){
     <button onclick="cargarMesas()">Ir al POS</button>`
 }
 
-// GLOBAL
-window.login = login
+// EVENTO LOGIN (PRO)
+document.getElementById("btnLogin").addEventListener("click", login)
+
+// GLOBAL (para onclick dinámicos)
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
 window.cerrarPedido = cerrarPedido
