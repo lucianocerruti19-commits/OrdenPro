@@ -19,18 +19,21 @@
 
 <script>
 
+console.log("SCRIPT OK")
+
 const supabase = window.supabase.createClient(
   "https://uumzxwtlvvqnmiwbrjly.supabase.co",
   "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
 )
 
+let perfilGlobal = null
+
 // LOGIN
 async function login(){
+    alert("click")
 
     const email = document.getElementById("email").value
     const password = document.getElementById("password").value
-
-    alert("Intentando login...") // 👈 DEBUG
 
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -41,8 +44,6 @@ async function login(){
         alert(error.message)
         return
     }
-
-    alert("Login OK")
 
     buscarPerfil(data.user.id)
 }
@@ -61,12 +62,13 @@ async function buscarPerfil(user_id){
         return
     }
 
+    perfilGlobal = data
+
     document.getElementById("panel").innerHTML =
         "<h1>Bienvenido " + data.nombre + "</h1>"
-
 }
 
-// EVENTO BOTÓN
+// EVENTO (CLAVE)
 document.getElementById("btnLogin").addEventListener("click", login)
 
 </script>
