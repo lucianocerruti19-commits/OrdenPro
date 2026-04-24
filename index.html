@@ -2,22 +2,96 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Restaurante</title>
 </head>
 
 <body>
 
-<h1>Test</h1>
+<h2>Login</h2>
 
-<button id="btn">Click</button>
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Password">
 
-<script type="module">
+<button id="btnLogin">Entrar</button>
+
+<div id="panel"></div>
+
+<!-- ✅ CDN CORRECTO -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
 
 console.log("JS cargado OK")
 
-document.getElementById("btn").addEventListener("click", () => {
-    alert("Funciona el click")
-})
+const supabaseUrl = "https://uumzxwtlvvqnmiwbrjly.supabase.co"
+const supabaseKey = "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
+
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey)
+
+let perfilGlobal = null
+
+// LOGIN
+async function login(){
+
+    const email = document.getElementById("email").value
+    const password = document.getElementById("password").value
+
+    if(!email || !password){
+        alert("Completá email y contraseña")
+        return
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if(error){
+        alert(error.message)
+        return
+    }
+
+    buscarPerfil(data.user.id)
+}
+
+// PERFIL
+async function buscarPerfil(user_id){
+
+    const { data, error } = await supabase
+        .from("perfiles")
+        .select("*")
+        .eq("id", user_id)
+        .single()
+
+    if(error){
+        alert("No se encontró perfil")
+        return
+    }
+
+    perfilGlobal = data
+    cargarMesas()
+}
+
+// MESAS
+async function cargarMesas(){
+
+    const { data } = await supabase
+        .from("mesas")
+        .select("*")
+        .eq("empresa_id", perfilGlobal.empresa_id)
+
+    const panel = document.getElementById("panel")
+    panel.innerHTML = "<h2>Mesas</h2>"
+
+    data.forEach(mesa => {
+        panel.innerHTML += `
+        <div onclick="abrirMesa('${mesa.id}')"
+        style="background:lightgreen; padding:10px; margin:5px;">
+            Mesa ${mesa.numero}
+        </div>`
+    })
+}
+
+// EVENTO
+document.getElementById("btnLogin").addEventListener("click", login)
 
 </script>
 
