@@ -144,19 +144,17 @@ function renderPedido(pedido, productos, items){
     const panel = document.getElementById("panel")
     panel.innerHTML = "<h2>Pedido</h2>"
 
-    // productos
     panel.innerHTML += "<h3>Agregar productos</h3>"
 
     productos.forEach(prod => {
         panel.innerHTML += `
             <div onclick="agregarProducto('${pedido.id}', '${prod.id}')"
-                style="border:1px solid black; padding:10px; margin:5px;">
+            style="border:1px solid black; padding:10px; margin:5px;">
                 ${prod.nombre} - $${prod.precio} (Stock: ${prod.stock})
             </div>
         `
     })
 
-    // cuenta
     let total = 0
     panel.innerHTML += "<h3>Cuenta</h3>"
 
@@ -180,9 +178,8 @@ function renderPedido(pedido, productos, items){
     `
 }
 
-// AGREGAR PRODUCTO CON STOCK
+// AGREGAR PRODUCTO
 async function agregarProducto(pedido_id, producto_id){
-    // traer producto
     const { data: producto } = await supabase
         .from("productos")
         .select("*")
@@ -194,18 +191,15 @@ async function agregarProducto(pedido_id, producto_id){
         return
     }
 
-    // agregar al pedido
     await supabase.from("pedido_items").insert([
         { pedido_id, producto_id, cantidad: 1 }
     ])
 
-    // descontar stock
     await supabase
         .from("productos")
         .update({ stock: producto.stock - 1 })
         .eq("id", producto_id)
 
-    // refrescar
     abrirMesaPorPedido(pedido_id)
 }
 
@@ -244,7 +238,7 @@ async function cerrarPedido(pedido_id, mesa_id){
     cargarMesas()
 }
 
-// PANEL ADMIN
+// ADMIN
 async function panelAdmin(){
     const { data: pedidos } = await supabase
         .from("pedidos")
@@ -273,6 +267,7 @@ async function verProductosVendidos(){
         .select("*, productos(nombre)")
 
     const contador = {}
+
     items.forEach(item => {
         const nombre = item.productos.nombre
         contador[nombre] = (contador[nombre] || 0) + item.cantidad
@@ -288,16 +283,16 @@ async function verProductosVendidos(){
     panel.innerHTML += `<br><button onclick="panelAdmin()">Volver</button>`
 }
 
-// GLOBAL
+// GLOBAL (CLAVE)
 window.login = login
 window.abrirMesa = abrirMesa
 window.agregarProducto = agregarProducto
 window.cerrarPedido = cerrarPedido
 window.panelAdmin = panelAdmin
 window.verProductosVendidos = verProductosVendidos
+window.cargarMesas = cargarMesas
 
 </script>
-window.cargarMesas = cargarMesas
 
 </body>
 </html>
