@@ -1,3 +1,75 @@
-<h1 style="color:red; font-size:40px;">
-ESTA ES LA VERSION NUEVA 999
-</h1>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>POS FIX</title>
+</head>
+
+<body>
+
+<h1 style="color:red;">VERSION NUEVA OK</h1>
+
+<h2>Login</h2>
+
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Password">
+<button id="btnLogin">Entrar</button>
+
+<div id="panel"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+
+window.onload = () => {
+
+    console.log("JS funcionando")
+
+    const btn = document.getElementById("btnLogin")
+
+    btn.addEventListener("click", async () => {
+
+        alert("CLICK FUNCIONA")
+
+        if(!window.supabase){
+            alert("Supabase no cargó")
+            return
+        }
+
+        const supabase = window.supabase.createClient(
+            "https://uumzxwtlvvqnmiwbrjly.supabase.co",
+            "sb_publishable_2L9Pqyzr6vjBCaZX-MuF3g_vY3EPLsS"
+        )
+
+        const email = document.getElementById("email").value
+        const password = document.getElementById("password").value
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        })
+
+        if(error){
+            alert(error.message)
+            return
+        }
+
+        alert("LOGIN OK")
+
+        const { data: perfil } = await supabase
+            .from("perfiles")
+            .select("*")
+            .eq("id", data.user.id)
+            .single()
+
+        document.getElementById("panel").innerHTML =
+            "<h2>Bienvenido " + perfil.nombre + "</h2>"
+
+    })
+
+}
+
+</script>
+
+</body>
+</html>
